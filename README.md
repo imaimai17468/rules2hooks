@@ -25,6 +25,28 @@ There is no Read call, so `frontend.md` never entered this session's context. As
 
 Rules without `paths:` have the opposite problem. They are loaded in full at every launch, so a commit-message style guide takes up context in a session that never commits, and moving it behind `paths:` would hit the problem above.
 
+## Hooks can add to the prompt
+
+Hooks are usually used to run a formatter or to block a command. They can also add text to what the model reads. When a `PreToolUse`, `PostToolUse` or `UserPromptSubmit` hook prints this JSON, Claude Code adds the `additionalContext` string to the model's context alongside that call ([docs](https://code.claude.com/docs/en/hooks)):
+
+```json
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "Read .claude/hooks/guidance/frontend.md before continuing."}}
+```
+
+A hook runs on every call its matcher covers, whichever tool the model chose, and it receives the call's arguments: the file path for Read and Edit, the whole command for Bash. In the session above, the hook sees `sed -n 1,80p src/components/UserCard.tsx`, finds a path under `src/**/*.tsx`, and tells the model to read the rule. Whether the rule loads no longer depends on the model choosing Read.
+
+The idea fits in a few lines of shell:
+
+```sh
+#!/bin/sh
+# PreToolUse: point at frontend.md whenever a call mentions a .tsx file
+if jq -r '.tool_input | .file_path // .command // ""' | grep -q '\.tsx'; then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Read .claude/hooks/guidance/frontend.md before continuing."}}'
+fi
+```
+
+This version repeats the line on every `.tsx` call and knows one rule. The script this skill installs reads the triggers from each rule's frontmatter, names each rule once per session (once per subagent too), checks what git reports as changed after a Bash call, and can be triggered by a command or a prompt as well as a path.
+
 ## What changes
 
 ```

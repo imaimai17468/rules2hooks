@@ -25,6 +25,28 @@ Read の呼び出しがないので、このセッションの文脈に `fronten
 
 `paths:` を持たないルールは逆で、起動のたびに全文が読み込まれます。コミットメッセージの書き方のルールは一度もコミットしないセッションでも文脈を占め、かといって `paths:` を付ければ上の問題に当たります。
 
+## フックでプロンプトに足す
+
+フックはフォーマッタを走らせたり、コマンドを止めたりする用途でよく使われます。モデルが読む文脈に文章を足すこともできます。`PreToolUse`、`PostToolUse`、`UserPromptSubmit` のフックが次の JSON を出力すると、Claude Code はその呼び出しと一緒に `additionalContext` の文字列をモデルの文脈に入れます（[ドキュメント](https://code.claude.com/docs/en/hooks)）。
+
+```json
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "Read .claude/hooks/guidance/frontend.md before continuing."}}
+```
+
+フックは、モデルがどのツールを選んだかに関係なく、matcher に合う呼び出しのたびに走り、呼び出しの引数を受け取ります。Read や Edit ならファイルパス、Bash ならコマンド全体です。上のセッションなら、フックは `sed -n 1,80p src/components/UserCard.tsx` を見て `src/**/*.tsx` にあたるパスを見つけ、モデルにルールを読むよう伝えます。ルールが読み込まれるかどうかが、モデルが Read を選ぶかどうかに左右されなくなります。
+
+考え方だけなら数行のシェルで書けます。
+
+```sh
+#!/bin/sh
+# PreToolUse: point at frontend.md whenever a call mentions a .tsx file
+if jq -r '.tool_input | .file_path // .command // ""' | grep -q '\.tsx'; then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Read .claude/hooks/guidance/frontend.md before continuing."}}'
+fi
+```
+
+この版は `.tsx` に触れる呼び出しのたびに同じ 1 行を出し、ルールも 1 本しか知りません。このスキルが入れるスクリプトは、各ルールの frontmatter からきっかけを読み、ルールごとにセッション（と subagent）で 1 回だけ案内し、Bash の後に git が変更ありと挙げたファイルも見て、パスだけでなくコマンドやプロンプトもきっかけにできます。
+
 ## 何が変わるか
 
 ```
