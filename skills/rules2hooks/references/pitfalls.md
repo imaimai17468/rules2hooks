@@ -26,6 +26,8 @@ Markers are directories in the OS temp directory named `claude-scoped-guidance-<
 
 A subagent has its own `agent_id` and its own markers, because it does not share the parent's context: the parent having read `react.md` does nothing for the subagent.
 
+A compaction or `/clear` keeps the session id and drops the guidance the model read. The `SessionStart` entry (matcher `compact|clear`) deletes the session's markers at that point, so each file is named again when the session next reaches it. A resumed session keeps its markers, because the transcript it resumes still holds the reads.
+
 After every file has been pointed at, the hook writes a `.complete-<count>` marker and the rest of the session returns immediately. `<count>` is the number of guidance files, so adding a file mid-session makes the hook look again. A subagent never fires `UserPromptSubmit`, so files reached only by that event are left out of its count; without that, its count would never complete.
 
 ## Cost per tool call

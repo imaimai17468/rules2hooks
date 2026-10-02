@@ -5,7 +5,8 @@
  * when the session reaches a file its `paths` cover, runs a command its
  * `commands` name, or fires an event its `events` list.
  *
- * Run it from PreToolUse, PostToolUse and UserPromptSubmit. Before a call, the
+ * Run it from PreToolUse, PostToolUse and UserPromptSubmit, and from
+ * SessionStart for `clear` and `compact`, which makes it name every file again. Before a call, the
  * paths and the command the call names decide; after a Bash call, the files git
  * lists as changed decide, which covers a write whose command named no path.
  *
@@ -377,8 +378,35 @@ const claimsFirstReach = (prefix, rule) => {
 export const guidanceFilesRead = (rules, paths) =>
   rules.filter((rule) => paths.includes(`${GUIDANCE_DIR}/${rule.name}`));
 
-export const runHook =(stdin, env = process.env, tmpDir = os.tmpdir()) => {
+/** The `SessionStart` sources after which the model no longer holds what it read. */
+export const CONTEXT_RESET_SOURCES = ["clear", "compact"];
+
+/**
+ * Remove every marker of one session, subagents included, so the guidance it
+ * read before `/clear` or a compaction is named again. The session keeps its
+ * id across both, while the model's context loses the files it read.
+ */
+export const forgetSession = (sessionId, tmpDir) => {
+  const session = fileNameSafe(sessionId);
+  if (session === "") {
+    return;
+  }
+  const start = `claude-scoped-guidance-${session}-`;
+  for (const name of fs.readdirSync(tmpDir)) {
+    if (name.startsWith(start)) {
+      fs.rmSync(path.join(tmpDir, name), { force: true, recursive: true });
+    }
+  }
+};
+
+export const runHook = (stdin, env = process.env, tmpDir = os.tmpdir()) => {
   const payload = JSON.parse(stdin);
+  if (payload.hook_event_name === "SessionStart") {
+    if (CONTEXT_RESET_SOURCES.includes(payload.source)) {
+      forgetSession(payload.session_id, tmpDir);
+    }
+    return "";
+  }
   if (!HOOK_EVENTS.includes(payload.hook_event_name)) {
     return "";
   }

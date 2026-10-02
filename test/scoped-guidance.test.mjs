@@ -268,3 +268,42 @@ describe("runCheck", () => {
     ]);
   });
 });
+
+describe("SessionStart", () => {
+  const call = (dir, overrides) =>
+    JSON.stringify({
+      cwd: dir,
+      hook_event_name: "PreToolUse",
+      session_id: "s1",
+      tool_input: { command: "cat src/a.tsx" },
+      tool_name: "Bash",
+      ...overrides,
+    });
+
+  it("should name a rule again after a compaction", () => {
+    const dir = makeProject("compact", { "react.md": REACT });
+    const tmp = fs.mkdtempSync(path.join(ROOT, "tmp-"));
+    const env = { CLAUDE_PROJECT_DIR: dir };
+    runHook(call(dir, {}), env, tmp);
+    runHook(call(dir, { hook_event_name: "SessionStart", source: "compact" }), env, tmp);
+    assert.notEqual(runHook(call(dir, {}), env, tmp), "");
+  });
+
+  it("should keep the markers when a session resumes", () => {
+    const dir = makeProject("resume", { "react.md": REACT });
+    const tmp = fs.mkdtempSync(path.join(ROOT, "tmp-"));
+    const env = { CLAUDE_PROJECT_DIR: dir };
+    runHook(call(dir, {}), env, tmp);
+    runHook(call(dir, { hook_event_name: "SessionStart", source: "resume" }), env, tmp);
+    assert.equal(runHook(call(dir, {}), env, tmp), "");
+  });
+
+  it("should leave another session's markers when one session clears", () => {
+    const dir = makeProject("clear-other", { "react.md": REACT });
+    const tmp = fs.mkdtempSync(path.join(ROOT, "tmp-"));
+    const env = { CLAUDE_PROJECT_DIR: dir };
+    runHook(call(dir, { session_id: "s2" }), env, tmp);
+    runHook(call(dir, { hook_event_name: "SessionStart", source: "clear" }), env, tmp);
+    assert.equal(runHook(call(dir, { session_id: "s2" }), env, tmp), "");
+  });
+});

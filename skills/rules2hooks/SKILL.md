@@ -89,6 +89,12 @@ Merge these entries into `.claude/settings.json`. Add to the existing `hooks` ar
       {
         "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|clear",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
+      }
     ]
   }
 }
@@ -96,7 +102,7 @@ Merge these entries into `.claude/settings.json`. Add to the existing `hooks` ar
 
 If step 1 found a hook that already does this job, remove its settings entries, its files and its tests rather than running both: left in place, it keeps scanning a directory that no longer exists on every call.
 
-Leave out the `UserPromptSubmit` entry when no guidance file lists that event, and the `PostToolUse` entry when no file has `paths`. The script needs Node 20 or later and git. If the project already runs hooks through another runtime (bun, deno), use it in the command and in the step 7 checks; the script uses only `node:` built-ins. The copied script is now project code, so add it to the lint, format or coverage configuration where those gates would reject it.
+The `SessionStart` entry makes the hook name every file again after `/clear` or a compaction, which keep the session id and drop what the model read. Leave out the `UserPromptSubmit` entry when no guidance file lists that event, and the `PostToolUse` entry when no file has `paths`. The script needs Node 20 or later and git. If the project already runs hooks through another runtime (bun, deno), use it in the command and in the step 7 checks; the script uses only `node:` built-ins. The copied script is now project code, so add it to the lint, format or coverage configuration where those gates would reject it.
 
 ## 6. Repoint references and close the gaps
 

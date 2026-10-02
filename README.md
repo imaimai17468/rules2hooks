@@ -70,6 +70,8 @@ Nothing loads the guidance files at launch. The hook reads their frontmatter on 
 | `commands` | a Bash command runs the phrase (`git commit`, `gh pr create`) |
 | `events` | `UserPromptSubmit`, `PreToolUse` or `PostToolUse` fires |
 
+Each file is named once per session, and again after `/clear` or a compaction, since those drop what the model read.
+
 The hook names the file instead of pasting its text, because `additionalContext` over 10,000 characters is saved to a file and the model sees a preview. A few rules covering the same file can pass that limit together, while a Read returns each file whole.
 
 ## Install
