@@ -8,14 +8,14 @@
 
 Claude Code は、frontmatter に `paths:` を持つルールを、Read ツールが該当ファイルを開いたときに読み込みます（[ドキュメント](https://code.claude.com/docs/en/memory)）。`sed -n 1,80p src/app/page.tsx`、`cat`、3 ファイルを書き換える python のヒアドキュメント、コード生成スクリプトのようにシェル経由で作業するセッションでは、ルールは読み込まれません。
 
-[imaimai-front-templete](https://github.com/imaimai17468/imaimai-front-templete) の記録では、`src/` への読み書きのほぼすべてが Bash 経由で、`src/` を触った 39 セッションのうち 15 件が、`src/` を対象とする React・デザイン・データ取得のルールを一度も読み込まないまま作業していました（[#308](https://github.com/imaimai17468/imaimai-front-templete/pull/308)）。`paths:` を持たないルールは逆で、文章の書き方のルールは、ドキュメントを編集せずコミットも PR も出さないセッションでも、起動のたびに全文が読み込まれていました。
+`paths:` を持たないルールは逆で、起動のたびに全文が読み込まれます。コミットメッセージの書き方のルールは、一度もコミットしないセッションでも文脈を占めます。
 
 ## 何が変わるか
 
 ```
 移行前                                  移行後
-.claude/rules/react.md     (paths)      .claude/hooks/guidance/react.md     paths: src/**/*.tsx
-.claude/rules/prose.md     (常時)       .claude/hooks/guidance/prose.md     paths: "**/*.md"
+.claude/rules/frontend.md  (paths)      .claude/hooks/guidance/frontend.md  paths: src/**/*.tsx
+.claude/rules/writing.md   (常時)       .claude/hooks/guidance/writing.md   paths: "**/*.md"
                                                                             commands: git commit, gh pr create
 .claude/rules/replies.md   (常時)       .claude/hooks/guidance/replies.md   events: UserPromptSubmit
                                         .claude/hooks/scoped-guidance.mjs
@@ -24,7 +24,7 @@ Claude Code は、frontmatter に `paths:` を持つルールを、Read ツー�
 起動時にガイダンスファイルを読み込む経路はありません。フックは Read、Edit、Write、Bash の呼び出しごとと、プロンプトごとに各ファイルの frontmatter を読みます。セッションがファイルの名指す対象に初めて触れたとき、モデルに次の 1 行を渡します。
 
 ```
-.claude/hooks/guidance/react.md applies because this session reached src/app/page.tsx. Read .claude/hooks/guidance/react.md completely before continuing. This hook names it once per session.
+.claude/hooks/guidance/frontend.md applies because this session reached src/app/page.tsx. Read .claude/hooks/guidance/frontend.md completely before continuing. This hook names it once per session.
 ```
 
 | キー | 届く条件 |
@@ -33,7 +33,7 @@ Claude Code は、frontmatter に `paths:` を持つルールを、Read ツー�
 | `commands` | Bash がそのフレーズ（`git commit`、`gh pr create`）をコマンドとして実行したとき |
 | `events` | `UserPromptSubmit`、`PreToolUse`、`PostToolUse` が発火したとき |
 
-本文を貼らずにファイル名を渡すのは、10,000 文字を超える `additionalContext` はファイルに保存され、モデルにはプレビューしか見えないためです。`.tsx` 1 つで届く 3 本のルールは 43.1 KB あり、2 KB に切られて届きました。
+本文を貼らずにファイル名を渡すのは、10,000 文字を超える `additionalContext` はファイルに保存され、モデルにはプレビューしか見えないためです。同じファイルにかかるルールが数本あれば、合わせてこの上限を超えます。Read ならファイルを丸ごと返します。
 
 ## インストール
 

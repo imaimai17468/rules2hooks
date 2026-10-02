@@ -8,14 +8,14 @@ A Claude Code skill that moves `.claude/rules/*.md` into guidance files a hook p
 
 Claude Code loads a rule with `paths:` frontmatter when the Read tool opens a matching file ([docs](https://code.claude.com/docs/en/memory)). A session that works through the shell instead (`sed -n 1,80p src/app/page.tsx`, `cat`, a python heredoc that rewrites three files, a codegen script) never loads it.
 
-In the transcripts of [imaimai-front-templete](https://github.com/imaimai17468/imaimai-front-templete), nearly every read and write under `src/` went through Bash, and 15 of the 39 sessions that touched `src/` worked without ever loading the React, design or data-fetching rules that cover it ([#308](https://github.com/imaimai17468/imaimai-front-templete/pull/308)). Rules without `paths:` had the opposite cost: the writing-style rule was loaded in full at every launch, including sessions that edited no document and published no commit or PR.
+Rules without `paths:` have the opposite cost. They are loaded in full at every launch, so a commit-message style guide takes up context in a session that never commits.
 
 ## What changes
 
 ```
 before                                  after
-.claude/rules/react.md     (paths)      .claude/hooks/guidance/react.md     paths: src/**/*.tsx
-.claude/rules/prose.md     (always)     .claude/hooks/guidance/prose.md     paths: "**/*.md"
+.claude/rules/frontend.md  (paths)      .claude/hooks/guidance/frontend.md  paths: src/**/*.tsx
+.claude/rules/writing.md   (always)     .claude/hooks/guidance/writing.md   paths: "**/*.md"
                                                                             commands: git commit, gh pr create
 .claude/rules/replies.md   (always)     .claude/hooks/guidance/replies.md   events: UserPromptSubmit
                                         .claude/hooks/scoped-guidance.mjs
@@ -24,7 +24,7 @@ before                                  after
 Nothing loads the guidance files at launch. The hook reads their frontmatter on each Read, Edit, Write and Bash call and on each prompt. The first time a session reaches what a file names, the model gets one line:
 
 ```
-.claude/hooks/guidance/react.md applies because this session reached src/app/page.tsx. Read .claude/hooks/guidance/react.md completely before continuing. This hook names it once per session.
+.claude/hooks/guidance/frontend.md applies because this session reached src/app/page.tsx. Read .claude/hooks/guidance/frontend.md completely before continuing. This hook names it once per session.
 ```
 
 | Key | Reached when |
@@ -33,7 +33,7 @@ Nothing loads the guidance files at launch. The hook reads their frontmatter on 
 | `commands` | a Bash command runs the phrase (`git commit`, `gh pr create`) |
 | `events` | `UserPromptSubmit`, `PreToolUse` or `PostToolUse` fires |
 
-The hook names the file instead of pasting its text, because `additionalContext` over 10,000 characters is saved to a file and the model sees a preview. Three rules for one `.tsx` file came to 43.1 KB and arrived cut to 2 KB.
+The hook names the file instead of pasting its text, because `additionalContext` over 10,000 characters is saved to a file and the model sees a preview. A few rules covering the same file can pass that limit together, while a Read returns each file whole.
 
 ## Install
 
