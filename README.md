@@ -2,13 +2,28 @@
 
 [日本語](README.ja.md)
 
-A Claude Code skill that moves `.claude/rules/*.md` into guidance files a hook points the model at, so a rule reaches the session that edits matching files through Bash, not only the one that opens them with the Read tool.
+A Claude Code skill for when your `.claude/rules` stop being followed because Claude edits files through Bash and python instead of the Read tool. It moves the rules into guidance files that a hook points the model at whenever a session touches the files they cover, through any tool.
 
 ## The problem
 
-Claude Code loads a rule with `paths:` frontmatter when the Read tool opens a matching file ([docs](https://code.claude.com/docs/en/memory)). A session that works through the shell instead (`sed -n 1,80p src/app/page.tsx`, `cat`, a python heredoc that rewrites three files, a codegen script) never loads it.
+You write `.claude/rules/frontend.md` with `paths: src/**/*.tsx`, and for a while Claude follows it. Then the output starts ignoring it. The file is still there, the frontmatter is still right, and nothing reports an error.
 
-Rules without `paths:` have the opposite cost. They are loaded in full at every launch, so a commit-message style guide takes up context in a session that never commits.
+Claude Code loads a path-scoped rule when the Read tool opens a matching file ([docs](https://code.claude.com/docs/en/memory)). Current models often skip Read and work through the shell:
+
+```
+> Add a loading state to UserCard
+
+● Bash(sed -n 1,80p src/components/UserCard.tsx)
+● Bash(python3 - <<'EOF'
+       p = Path("src/components/UserCard.tsx")
+       p.write_text(p.read_text().replace(...))
+       EOF)
+● Done. UserCard now shows a skeleton while loading.
+```
+
+There is no Read call, so `frontend.md` never entered this session's context. As more of the work goes through Bash, fewer sessions load the rule, and from the outside this looks like the model ignoring instructions.
+
+Rules without `paths:` have the opposite problem. They are loaded in full at every launch, so a commit-message style guide takes up context in a session that never commits, and moving it behind `paths:` would hit the problem above.
 
 ## What changes
 

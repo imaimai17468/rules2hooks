@@ -2,13 +2,28 @@
 
 [English](README.md)
 
-`.claude/rules/*.md` を、フックが読みに行かせるガイダンスファイルへ移す Claude Code のスキルです。Read ツールでファイルを開いたセッションだけでなく、Bash 経由で該当ファイルを編集するセッションにも規約が届くようになります。
+Claude が Read ツールを使わず Bash や python でファイルを読み書きするようになり、`.claude/rules` が守られなくなったときのための Claude Code のスキルです。ルールをガイダンスファイルへ移し、どのツール経由でも、対象のファイルに触れたセッションにフックがそのファイルを読ませます。
 
 ## 何が起きているか
 
-Claude Code は、frontmatter に `paths:` を持つルールを、Read ツールが該当ファイルを開いたときに読み込みます（[ドキュメント](https://code.claude.com/docs/en/memory)）。`sed -n 1,80p src/app/page.tsx`、`cat`、3 ファイルを書き換える python のヒアドキュメント、コード生成スクリプトのようにシェル経由で作業するセッションでは、ルールは読み込まれません。
+`paths: src/**/*.tsx` を付けた `.claude/rules/frontend.md` を書くと、しばらくは守られます。やがて出力がそのルールを無視し始めます。ファイルは残っていて frontmatter も正しく、エラーも出ません。
 
-`paths:` を持たないルールは逆で、起動のたびに全文が読み込まれます。コミットメッセージの書き方のルールは、一度もコミットしないセッションでも文脈を占めます。
+Claude Code は、`paths:` を持つルールを、Read ツールが該当ファイルを開いたときに読み込みます（[ドキュメント](https://code.claude.com/docs/en/memory)）。いまのモデルは Read を使わず、シェル経由で作業することがよくあります。
+
+```
+> UserCard にローディング状態を足して
+
+● Bash(sed -n 1,80p src/components/UserCard.tsx)
+● Bash(python3 - <<'EOF'
+       p = Path("src/components/UserCard.tsx")
+       p.write_text(p.read_text().replace(...))
+       EOF)
+● 完了しました。読み込み中は UserCard にスケルトンを表示します。
+```
+
+Read の呼び出しがないので、このセッションの文脈に `frontend.md` は一度も入っていません。Bash 経由の作業が増えるほどルールが届くセッションは減り、外からはモデルが指示を無視しているように見えます。
+
+`paths:` を持たないルールは逆で、起動のたびに全文が読み込まれます。コミットメッセージの書き方のルールは一度もコミットしないセッションでも文脈を占め、かといって `paths:` を付ければ上の問題に当たります。
 
 ## 何が変わるか
 
