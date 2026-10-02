@@ -107,6 +107,24 @@ node <path-to-skill>/scripts/measure.mjs
 
 It reads the project's transcripts in `~/.claude/projects/` and prints one line per path-scoped rule: how many sessions touched a covered file, and how many of those never opened one with Read.
 
+## Why not something simpler?
+
+**Put the rules in CLAUDE.md or AGENTS.md.** That file is loaded in full at every launch, so it reaches every session, Bash or not. It also puts every rule into every session: the React conventions in a session that edits a migration, the commit style in one that never commits. Keep in it what must hold in every turn, which is usually a few sentences. The skill's step 3 moves such principles there and hooks the rest.
+
+**Make each rule a skill.** A skill is loaded when the model decides its description matches the task, so whether a convention applies depends on the model choosing to load it. A rule should apply because a file was touched. When many skills are installed, Claude Code also shortens the skill listing to fit a budget, and a description cut from the listing cannot be matched ([docs](https://code.claude.com/docs/en/skills)). Skills fit procedures the user asks for ("deploy", "write a migration"); hooked guidance fits constraints on any edit to certain files.
+
+**Tell the model to always use Read.** That is another instruction the model may not follow, and it is the kind this skill exists because of. A hook runs whatever tool the model picks.
+
+**Block Bash edits with a PreToolUse hook.** It works, at the cost of a refused call and a retry each time, and it takes away multi-file python edits the model is good at. This skill adds context and leaves the call alone.
+
+**Inject the rule's text from the hook.** `additionalContext` over 10,000 characters is saved to a file and the model sees a preview, and a few rules on one file pass that easily. The pointer costs one Read per rule per session and arrives whole.
+
+**Use a linter.** Where a linter, formatter or type checker can check a rule, it should, and the skill's step 3 deletes rules a tool already enforces. The guidance files are for the decisions a tool cannot check.
+
+**Claude Code may fix this.** If path-scoped rules start loading on Bash access, moving back is a `git mv` per file and removing three entries from `.claude/settings.json`. The guidance files keep the same frontmatter keys for paths.
+
+**Does the model follow the pointer?** It is an instruction, so it is not guaranteed. In the end-to-end run behind this README, the model ran `cat` on the guidance file right after the pointer and applied the rule; that one run is all the evidence so far. `measure.mjs` shows how often your current rules miss, so you can judge whether the change is worth it on your project.
+
 ## Requirements and limits
 
 - Node 20 or later and git. The hook uses only `node:` built-ins and is copied into the project, so the project does not depend on this skill staying installed.
