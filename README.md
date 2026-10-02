@@ -74,7 +74,17 @@ Each file is named once per session, and again after `/clear` or a compaction, s
 
 The hook names the file instead of pasting its text, because `additionalContext` over 10,000 characters is saved to a file and the model sees a preview. A few rules covering the same file can pass that limit together, while a Read returns each file whole.
 
-## Install
+## Measured
+
+A fixture project has one rule, `paths: src/**/*.tsx`, asking for a fixed first line in every `.tsx` file under `src/`. Claude Code 2.1.287 with its default model was asked ten times per setup to add a prop to `src/components/UserCard.tsx`, reading and editing only through Bash. Each run was a fresh clone with its own session.
+
+| Setup | Runs that followed the rule |
+|---|---|
+| `.claude/rules/frontend.md` | 0 of 10 |
+| `.claude/hooks/guidance/frontend.md` + the hook | 10 of 10 |
+
+The prompt tells the model to use Bash so that every run takes the path where the rule is lost. How often a session takes that path without being told depends on the model and the task; `measure.mjs` counts it on your own transcripts. `eval/run.sh` reruns this measurement.
+
 
 As a Claude Code plugin:
 
@@ -125,7 +135,7 @@ It reads the project's transcripts in `~/.claude/projects/` and prints one line 
 
 **Claude Code may fix this.** If path-scoped rules start loading on Bash access, moving back is a `git mv` per file and removing three entries from `.claude/settings.json`. The guidance files keep the same frontmatter keys for paths.
 
-**Does the model follow the pointer?** It is an instruction, so it is not guaranteed. In the end-to-end run behind this README, the model ran `cat` on the guidance file right after the pointer and applied the rule; that one run is all the evidence so far. `measure.mjs` shows how often your current rules miss, so you can judge whether the change is worth it on your project.
+**Does the model follow the pointer?** It is an instruction, so nothing forces it. In the measurement above, the model read the guidance file right after the pointer and applied the rule in 10 of 10 runs.
 
 ## Requirements and limits
 
@@ -140,7 +150,8 @@ It reads the project's transcripts in `~/.claude/projects/` and prints one line 
 ## Development
 
 ```sh
-node --test test/*.test.mjs
+node --test test/*.test.mjs   # unit tests
+eval/run.sh 10                # the measurement above; needs an authenticated claude CLI
 ```
 
 ## License
