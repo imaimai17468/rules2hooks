@@ -20,13 +20,154 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  frontmatterOf,
-  matchesGlob,
-  namedPaths,
-  projectRelative,
-  readList,
-} from "./scoped-guidance.mjs";
+
+// The frontmatter, glob and path rules below read a rule the way the hook does.
+
+const LIST_ITEM = /^\s+-\s+/u;
+const QUOTED = /^(?<quote>["'])(?<inner>.*)\k<quote>$/u;
+
+const unquote = (value) => {
+  const trimmed = value.trim();
+  return QUOTED.exec(trimmed)?.groups?.inner ?? trimmed;
+};
+
+const blockItems = (after) => {
+  const end = after.findIndex((line) => !LIST_ITEM.test(line));
+  return after
+    .slice(0, end === -1 ? after.length : end)
+    .map((line) => unquote(line.replace(LIST_ITEM, "")));
+};
+
+/** Split on commas outside braces, so `src/*.{ts,tsx}` stays one item. */
+const splitItems = (value) => {
+  const items = [""];
+  let depth = 0;
+  for (const char of value) {
+    if (char === "{") depth += 1;
+    if (char === "}" && depth > 0) depth -= 1;
+    if (char === "," && depth === 0) items.push("");
+    else items[items.length - 1] += char;
+  }
+  return items;
+};
+
+const inlineItems = (inline) => {
+  const flow = inline.startsWith("[") && inline.endsWith("]");
+  return splitItems(flow ? inline.slice(1, -1) : unquote(inline)).map(unquote);
+};
+
+/**
+ * The items under one frontmatter key, in three spellings: one
+ * comma-separated string, a flow list, and a block list. Only these keys are
+ * read, so no YAML parser loads on every tool call.
+ */
+const readList = (frontmatter, key) => {
+  const prefix = `${key}:`;
+  const lines = frontmatter.split(/\r?\n/u);
+  const at = lines.findIndex((line) => line.startsWith(prefix));
+  if (at === -1) {
+    return [];
+  }
+  const inline = lines[at].slice(prefix.length).trim();
+  const items =
+    inline === "" ? blockItems(lines.slice(at + 1)) : inlineItems(inline);
+  return items.filter((item) => item !== "");
+};
+
+/** The frontmatter block of a file, or `undefined` where it has none. */
+const frontmatterOf = (text) =>
+  /^---\r?\n(?<body>[\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text)?.groups?.body;
+
+const escapeRegExp = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+/**
+ * A glob as a regular expression over a `/`-separated project-relative path.
+ * `**` crosses directories, `*` and `?` stay inside one, `{a,b}` picks one, and
+ * `[...]` is a character class. `*.md` matches a root file only, as
+ * `path.matchesGlob` reads it.
+ */
+const globToRegExp = (glob) => {
+  let source = "";
+  for (let i = 0; i < glob.length; i += 1) {
+    const char = glob[i];
+    if (char === "*" && glob[i + 1] === "*") {
+      const slashAfter = glob[i + 2] === "/";
+      source += slashAfter ? "(?:.*/)?" : ".*";
+      i += slashAfter ? 2 : 1;
+    } else if (char === "*") {
+      source += "[^/]*";
+    } else if (char === "?") {
+      source += "[^/]";
+    } else if (char === "{") {
+      const close = glob.indexOf("}", i);
+      if (close === -1) {
+        source += "\\{";
+      } else {
+        const options = glob.slice(i + 1, close).split(",");
+        source += `(?:${options.map((option) => globToRegExp(option).source.slice(1, -1)).join("|")})`;
+        i = close;
+      }
+    } else if (char === "[") {
+      const close = glob.indexOf("]", i + 1);
+      if (close === -1) {
+        source += "\\[";
+      } else {
+        const body = glob.slice(i + 1, close).replace(/^!/u, "^");
+        source += `[${body}]`;
+        i = close;
+      }
+    } else {
+      source += escapeRegExp(char);
+    }
+  }
+  return new RegExp(`^${source}$`, "u");
+};
+
+const matchesGlob = (candidate, glob) =>
+  globToRegExp(glob).test(candidate.split(path.sep).join("/"));
+
+/**
+ * A run of path characters ending in an extension. It reads
+ * `Path("src/app/page.tsx")` inside a python heredoc and
+ * `sed -n 1,20p src/routes/index.tsx` alike. A word it reads that names no
+ * file the command opens, such as a path inside a grep pattern, costs one
+ * pointer line and nothing more.
+ */
+const PATH_IN_COMMAND = /[\w.${}@~[\]/-]*\.[A-Za-z]\w*/gu;
+
+/** The paths a tool call names, as the call wrote them. */
+const namedPaths = (toolInput) => {
+  const direct = [toolInput.file_path, toolInput.notebook_path].filter(
+    (value) => typeof value === "string"
+  );
+  const command =
+    typeof toolInput.command === "string"
+      ? (toolInput.command.match(PATH_IN_COMMAND) ?? [])
+      : [];
+  return [...direct, ...command];
+};
+
+const PROJECT_DIR_VARIABLE =
+  /^(?:\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\})\//u;
+
+/**
+ * A path relative to the project root, which is what `paths` are written
+ * against, or `undefined` where it lies outside the project.
+ */
+const projectRelative = (written, cwd, projectDir) => {
+  const expanded = written.replace(PROJECT_DIR_VARIABLE, `${projectDir}/`);
+  const relative = path.relative(projectDir, path.resolve(cwd, expanded));
+  if (
+    relative === "" ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    return undefined;
+  }
+  return relative.split(path.sep).join("/");
+};
+
 
 const argValue = (flag) => {
   const at = process.argv.indexOf(flag);

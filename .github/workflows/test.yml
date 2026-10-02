@@ -7,14 +7,18 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node: [20, 22, 24]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
+      - run: bash --version | head -1
       - run: git config --global user.email ci@example.com && git config --global user.name ci
       - run: npm test
+      - if: runner.os == 'Linux'
+        run: shellcheck -s bash -S warning skills/rules2hooks/scripts/scoped-guidance.sh

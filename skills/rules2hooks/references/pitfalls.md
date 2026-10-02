@@ -32,13 +32,13 @@ After every file has been pointed at, the hook writes a `.complete-<count>` mark
 
 ## Cost per tool call
 
-The hook runs on every Read, Edit, Write and Bash call. Each call starts Node: ten calls against a project with six guidance files took 0.67 s in total on the machine this was written on, about 67 ms each. Once a session is complete, the script lists the guidance directory, finds the marker and exits without reading any file. If that is too slow, put a shell wrapper in front that checks the complete marker before starting Node, as the source project does with bun.
+The hook runs on every Read, Edit, Write and Bash call. Against a project with six guidance files, on the machine this was written on, a call took about 36 ms when nothing matched and 46 ms when it printed a pointer. It reads the payload in one awk pass and every guidance file in another, so the cost grows little with the number of files. Once a session has been pointed at every file, a call finds the completion marker and exits before reading anything, in about 8 ms.
 
 PostToolUse on Bash runs `git ls-files` and `git diff --cached`, which is fast on most repositories. On a very large monorepo, drop the PostToolUse entry and rely on the PreToolUse path scan.
 
 ## Typos fail silently
 
-A file whose frontmatter names no trigger, or an event the hook does not answer (`UserPromptSubmitt`, `SessionStart`), reaches no session and produces no error. `node .claude/hooks/scoped-guidance.mjs --check` reports both and exits 1. Run it in CI or a pre-commit hook.
+A file whose frontmatter names no trigger, or an event the hook does not answer (`UserPromptSubmitt`, `SessionStart`), reaches no session and produces no error. `bash .claude/hooks/scoped-guidance.sh --check` reports both and exits 1. Run it in CI or a pre-commit hook.
 
 ## Editors other than Claude Code
 

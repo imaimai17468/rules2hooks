@@ -7,7 +7,7 @@ description: Move a project's `.claude/rules/*.md` into guidance files that a ho
 
 Claude Code loads a rule with `paths` frontmatter when the Read tool opens a matching file. A session that opens and writes files through Bash (`sed -n`, `cat`, a python heredoc, a codegen script) never triggers that load, so the rule is absent exactly where the work happens. A rule without `paths` has the opposite cost: it is loaded in full at every launch, whether the session needs it or not.
 
-This skill moves each rule into `.claude/hooks/guidance/`, where nothing loads it automatically, and installs `scripts/scoped-guidance.mjs` as a hook. The hook reads each file's frontmatter and, the first time a session reaches what it names, adds one line of context telling the model to Read that file:
+This skill moves each rule into `.claude/hooks/guidance/`, where nothing loads it automatically, and installs `scripts/scoped-guidance.sh` as a hook. The hook reads each file's frontmatter and, the first time a session reaches what it names, adds one line of context telling the model to Read that file:
 
 | Key | Reached when |
 |---|---|
@@ -35,6 +35,8 @@ Before changing anything, measure how often the current rules missed. From the p
 ```sh
 node <skill-dir>/scripts/measure.mjs
 ```
+
+The measurement needs Node 20 or later. Where Node is not installed, report this step as "not run"; the migration itself does not need Node.
 
 It reads this project's transcripts under `~/.claude/projects/` and prints, for each rule with `paths`, how many sessions touched a covered file and how many of those never opened one with the Read tool. Those are sessions the rule did not reach. Pass `--transcripts <dir>` where the transcripts live elsewhere and `--json` for machine-readable output. Paths are read off Bash commands by pattern, so open two or three of the counted sessions before quoting the number. Put the number in the commit message or PR body: it is the reason for the change. When it finds no transcripts, or no session touched a covered file, say that and quote no number.
 
@@ -65,7 +67,7 @@ Remove `.claude/rules/` once it is empty. If the project keeps Cursor mirrors of
 Copy the script into the project, so the project does not depend on where this skill is installed:
 
 ```sh
-cp <skill-dir>/scripts/scoped-guidance.mjs .claude/hooks/scoped-guidance.mjs
+cp <skill-dir>/scripts/scoped-guidance.sh .claude/hooks/scoped-guidance.sh
 ```
 
 Merge these entries into `.claude/settings.json`. Add to the existing `hooks` arrays rather than replacing them; read the file first and keep every hook already there.
@@ -76,24 +78,24 @@ Merge these entries into `.claude/settings.json`. Add to the existing `hooks` ar
     "PreToolUse": [
       {
         "matcher": "Read|Edit|MultiEdit|Write|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "SessionStart": [
       {
         "matcher": "compact|clear",
-        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.mjs", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ]
   }
@@ -102,7 +104,7 @@ Merge these entries into `.claude/settings.json`. Add to the existing `hooks` ar
 
 If step 1 found a hook that already does this job, remove its settings entries, its files and its tests rather than running both: left in place, it keeps scanning a directory that no longer exists on every call.
 
-The `SessionStart` entry makes the hook name every file again after `/clear` or a compaction, which keep the session id and drop what the model read. Leave out the `UserPromptSubmit` entry when no guidance file lists that event, and the `PostToolUse` entry when no file has `paths`. The script needs Node 20 or later and git. If the project already runs hooks through another runtime (bun, deno), use it in the command and in the step 7 checks; the script uses only `node:` built-ins. The copied script is now project code, so add it to the lint, format or coverage configuration where those gates would reject it.
+The `SessionStart` entry makes the hook name every file again after `/clear` or a compaction, which keep the session id and drop what the model read. Leave out the `UserPromptSubmit` entry when no guidance file lists that event, and the `PostToolUse` entry when no file has `paths`. The script needs bash 3.2 or later, awk, sed, grep and git, which every platform Claude Code runs hooks on already has (macOS, Linux, WSL, and Git Bash on Windows). The copied script is now project code, so add it to the lint, format or coverage configuration where those gates would reject it.
 
 ## 6. Repoint references and close the gaps
 
@@ -116,12 +118,12 @@ Run each check and include its output in the report.
 
 ```sh
 # every guidance file has a trigger the hook answers
-node .claude/hooks/scoped-guidance.mjs --check
+bash .claude/hooks/scoped-guidance.sh --check
 
 # a Bash call that names a covered file gets a pointer
 # pick a real file: git ls-files | grep -m1 -E '<a pattern from one paths list, as a regex>'
 printf '%s' '{"hook_event_name":"PreToolUse","session_id":"verify-1","cwd":"'"$PWD"'","tool_name":"Bash","tool_input":{"command":"sed -n 1,20p src/app/page.tsx"}}' \
-  | CLAUDE_PROJECT_DIR="$PWD" node .claude/hooks/scoped-guidance.mjs
+  | CLAUDE_PROJECT_DIR="$PWD" bash .claude/hooks/scoped-guidance.sh
 
 # the same call again prints nothing: once per session
 ```

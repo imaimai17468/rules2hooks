@@ -55,7 +55,7 @@ before                                  after
 .claude/rules/writing.md   (always)     .claude/hooks/guidance/writing.md   paths: "**/*.md"
                                                                             commands: git commit, gh pr create
 .claude/rules/replies.md   (always)     .claude/hooks/guidance/replies.md   events: UserPromptSubmit
-                                        .claude/hooks/scoped-guidance.mjs
+                                        .claude/hooks/scoped-guidance.sh
 ```
 
 Nothing loads the guidance files at launch. The hook reads their frontmatter on each Read, Edit, Write and Bash call and on each prompt. The first time a session reaches what a file names, the model gets one line:
@@ -139,8 +139,9 @@ It reads the project's transcripts in `~/.claude/projects/` and prints one line 
 
 ## Requirements and limits
 
-- Node 20 or later and git. The hook uses only `node:` built-ins and is copied into the project, so the project does not depend on this skill staying installed.
-- Each hooked tool call starts Node, about 67 ms per call on the machine it was measured on. Once every file has been pointed at, the rest of the session returns without reading any file.
+- The hook is a bash script that needs only bash 3.2 or later, awk, sed, grep and git, which macOS, Linux, WSL and Git Bash on Windows already have. No language runtime is installed. It is copied into the project, so teammates who clone the repository get it without installing this skill.
+- A hooked tool call takes about 36 to 46 ms with six guidance files, measured on one Linux machine. Once a session has been pointed at every file, a call exits in about 8 ms. The tests pass under bash 3.2 with BSD awk (the macOS defaults), and under gawk, mawk and BusyBox awk; Windows is not tested yet.
+- `measure.mjs` is optional and needs Node 20 or later.
 - A hook adds context and does not block. A rule triggered by `git commit` arrives while that first commit is already running, so the skill adds a "read the writing guidance before drafting" step to the workflows that write commit messages and PR bodies.
 - Path detection in Bash commands is a pattern match. A path inside a grep pattern counts as a touch, which costs one unneeded pointer.
 - Hooks run only in Claude Code. Cursor, Codex and other agents get no pointers and need to open the guidance file themselves.

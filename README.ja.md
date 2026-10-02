@@ -55,7 +55,7 @@ fi
 .claude/rules/writing.md   (常時)       .claude/hooks/guidance/writing.md   paths: "**/*.md"
                                                                             commands: git commit, gh pr create
 .claude/rules/replies.md   (常時)       .claude/hooks/guidance/replies.md   events: UserPromptSubmit
-                                        .claude/hooks/scoped-guidance.mjs
+                                        .claude/hooks/scoped-guidance.sh
 ```
 
 起動時にガイダンスファイルを読み込む経路はありません。フックは Read、Edit、Write、Bash の呼び出しごとと、プロンプトごとに各ファイルの frontmatter を読みます。セッションがファイルの名指す対象に初めて触れたとき、モデルに次の 1 行を渡します。
@@ -139,8 +139,9 @@ node <スキルのパス>/scripts/measure.mjs
 
 ## 動作条件と限界
 
-- Node 20 以降と git が必要です。フックは `node:` の組み込みモジュールだけを使い、プロジェクトにコピーされるので、このスキルを消してもプロジェクトは動きます。
-- フックの対象になるツール呼び出しのたびに Node が起動します。計測したマシンでは 1 回あたり約 67 ms でした。すべてのファイルを案内し終えたセッションでは、以後どのファイルも読まずに抜けます。
+- フックは bash スクリプトで、bash 3.2 以降、awk、sed、grep、git だけで動きます。どれも macOS、Linux、WSL、Windows の Git Bash に最初から入っていて、言語ランタイムを入れる必要はありません。スクリプトはプロジェクトにコピーされるので、リポジトリを clone したチームメンバーはこのスキルを入れなくても使えます。
+- フックの対象になるツール呼び出し 1 回あたり、ガイダンスファイル 6 本で約 36〜46 ms でした（Linux のマシン 1 台で計測）。すべてのファイルを案内し終えたセッションでは約 8 ms で抜けます。テストは bash 3.2 と BSD awk（macOS の既定）、gawk、mawk、BusyBox awk で通っています。Windows はまだ試していません。
+- `measure.mjs` は任意の道具で、Node 20 以降が必要です。
 - フックは文脈を足すだけで、呼び出しを止めません。`git commit` で届くルールは、最初のコミットがすでに走っているときに届きます。そのため、コミットメッセージや PR 本文を書くワークフローに「書く前にガイダンスを読む」手順を足すところまでをスキルが行います。
 - Bash のコマンドからのパス検出はパターン照合です。grep のパターンに書いたパスも触れたものとして数え、不要な案内が 1 行出ることがあります。
 - フックが動くのは Claude Code だけです。Cursor や Codex などのエージェントには案内が届かないので、必要なガイダンスファイルを自分で開く必要があります。
