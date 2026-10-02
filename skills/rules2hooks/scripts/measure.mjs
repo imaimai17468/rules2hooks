@@ -204,7 +204,7 @@ export const pathScopedRules = (projectDir, rulesDir) =>
     const patterns = readList(frontmatterOf(fs.readFileSync(file, "utf8")) ?? "", "paths");
     return patterns.length === 0
       ? []
-      : [{ file: path.relative(projectDir, file), patterns }];
+      : [{ file: path.relative(projectDir, file).split(path.sep).join("/"), patterns }];
   });
 
 /** Each tool call one transcript records, as `{ name, input, cwd }`. */

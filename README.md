@@ -140,7 +140,7 @@ It reads the project's transcripts in `~/.claude/projects/` and prints one line 
 ## Requirements and limits
 
 - The hook is a bash script that needs only bash 3.2 or later, awk, sed, grep and git, which macOS, Linux, WSL and Git Bash on Windows already have. No language runtime is installed. It is copied into the project, so teammates who clone the repository get it without installing this skill.
-- A hooked tool call takes about 36 to 46 ms with six guidance files, measured on one Linux machine. Once a session has been pointed at every file, a call exits in about 8 ms. The tests pass under bash 3.2 with BSD awk (the macOS defaults), and under gawk, mawk and BusyBox awk; Windows is not tested yet.
+- A hooked tool call takes about 36 to 46 ms with six guidance files, measured on one Linux machine. Once a session has been pointed at every file, a call exits in about 8 ms. CI runs the tests on Linux, macOS (bash 3.2 and BSD awk) and Windows (Git Bash). On Windows the hook reads `C:\\proj`, `C:/proj` and Git Bash's `/c/proj` as the same path, and finds the project from the git work tree when `CLAUDE_PROJECT_DIR` is not set. The tests run on CI machines; no Claude Code session on Windows has been run against it yet.
 - `measure.mjs` is optional and needs Node 20 or later.
 - A hook adds context and does not block. A rule triggered by `git commit` arrives while that first commit is already running, so the skill adds a "read the writing guidance before drafting" step to the workflows that write commit messages and PR bodies.
 - Path detection in Bash commands is a pattern match. A path inside a grep pattern counts as a touch, which costs one unneeded pointer.
