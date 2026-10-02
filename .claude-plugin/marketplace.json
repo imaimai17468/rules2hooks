@@ -1,0 +1,12 @@
+{
+  "name": "rules2hooks",
+  "description": "Move .claude/rules into hook-injected guidance.",
+  "owner": { "name": "imaimai17468", "url": "https://github.com/imaimai17468" },
+  "plugins": [
+    {
+      "name": "rules2hooks",
+      "source": "./",
+      "description": "Move .claude/rules into guidance files a hook points the model at, so rules reach sessions that edit files through Bash."
+    }
+  ]
+}

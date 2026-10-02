@@ -1,0 +1,9 @@
+{
+  "name": "rules2hooks",
+  "version": "0.1.0",
+  "description": "Move .claude/rules into guidance files a hook points the model at, so rules reach sessions that edit files through Bash.",
+  "author": { "name": "imaimai17468", "url": "https://github.com/imaimai17468" },
+  "repository": "https://github.com/imaimai17468/rules2hooks",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "hooks", "rules", "memory"]
+}
