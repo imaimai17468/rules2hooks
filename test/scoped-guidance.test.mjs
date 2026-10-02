@@ -211,7 +211,7 @@ describe("SessionStart", () => {
 });
 
 describe("output", () => {
-  it("should escape a quote and a backslash in a path so the output stays JSON", () => {
+  it("should escape a quote and a backslash in a path so the output stays JSON", { skip: process.platform === "win32" && "a backslash separates paths on Windows" }, () => {
     const dir = makeProject({ "react.md": REACT });
     const out = hook(dir, { hook_event_name: "PreToolUse", tool_input: { file_path: 'src/a"b\\c.tsx' }, tool_name: "Edit" });
     assert.equal(contextOf(out.stdout), pointer("react.md", 'reached src/a"b\\c.tsx'));

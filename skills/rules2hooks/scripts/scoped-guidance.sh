@@ -345,9 +345,15 @@ run_hook() {
   is_hook_event "$event" || return 0
 
   # CLAUDE_PROJECT_DIR is missing in some Windows sessions; the work tree
-  # holding cwd is the project there.
-  local project=${CLAUDE_PROJECT_DIR:-}
-  [ -n "$project" ] || project=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || project=$cwd
+  # holding cwd is the project there. It is cut from cwd's own spelling, since
+  # git spells the top level its own way (/private/var for /var on macOS).
+  local project=${CLAUDE_PROJECT_DIR:-} inside
+  if [ -z "$project" ] && [ -n "$cwd" ]; then
+    project=$cwd
+    [[ $project =~ $DRIVE_PATH ]] && project=${project//\\//}
+    inside=$(git -C "$project" rev-parse --show-prefix 2>/dev/null) && inside=${inside%/} &&
+      [ -n "$inside" ] && project=${project%/"$inside"}
+  fi
   [ -n "$cwd" ] || cwd=$project
   # A backslash in a glob escapes the next character, and Git Bash takes `/`
   # in a Windows path, so `C:\proj` is read as `C:/proj`.
