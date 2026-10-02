@@ -42,7 +42,7 @@ TSX
   mkdir -p "$dir/.claude/hooks/guidance"
   git -C "$dir" mv .claude/rules/frontend.md .claude/hooks/guidance/frontend.md
   cp "$REPO/skills/rules2hooks/scripts/scoped-guidance.sh" "$dir/.claude/hooks/"
-  local cmd='bash "$CLAUDE_PROJECT_DIR"/.claude/hooks/scoped-guidance.sh'
+  local cmd='bash "${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/scoped-guidance.sh'
   cat > "$dir/.claude/settings.json" <<JSON
 {
   "hooks": {

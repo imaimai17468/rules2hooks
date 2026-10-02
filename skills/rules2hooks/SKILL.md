@@ -78,24 +78,24 @@ Merge these entries into `.claude/settings.json`. Add to the existing `hooks` ar
     "PreToolUse": [
       {
         "matcher": "Read|Edit|MultiEdit|Write|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ],
     "SessionStart": [
       {
         "matcher": "compact|clear",
-        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/scoped-guidance.sh", "timeout": 15 }]
       }
     ]
   }

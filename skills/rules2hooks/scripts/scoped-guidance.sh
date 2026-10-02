@@ -183,16 +183,46 @@ paths_in_command() {
   printf '%s\n' "$1" | grep -oE '[[:alnum:]_.${}@~/-]*\.[A-Za-z][[:alnum:]_]*' || true
 }
 
+# Patterns kept in variables, because bash 3.2 cannot parse a parenthesis
+# written inside [[ =~ ]].
+DRIVE_PATH='^([A-Za-z]):([/\\]|$)'
+GIT_BASH_DRIVE='^/([A-Za-z])(/|$)'
+
+# Set NORM to the path as the project spells it. Off a Windows drive the path
+# is kept as written, a backslash included. On one, `\` becomes `/`, Git
+# Bash's `/c/a` becomes `c:/a`, and the drive letter is lowercased, so
+# `C:\a\b`, `C:/a/b` and `/c/a/b` all read `c:/a/b`.
+normalize_path() {
+  local p=$1 on_drive=${2:-} drive
+  if [ -z "$on_drive" ]; then NORM=$p; return; fi
+  p=${p//\\//}
+  if [[ $p =~ $GIT_BASH_DRIVE ]]; then
+    p="${BASH_REMATCH[1]}:${p:2}"
+  fi
+  if [[ $p =~ $DRIVE_PATH ]]; then
+    drive=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')
+    p="$drive:${p:2}"
+  fi
+  NORM=$p
+}
+
 # Set REL to a path relative to the project root, or to nothing where the
-# path lies outside it.
+# path lies outside it. Segments are resolved without touching the disk.
 project_relative() {
-  local written=$1 cwd=$2 project=$3 full part out=""
+  local written=$1 cwd=$2 project=$3 full part out="" on_drive=""
   REL=""
   case $written in
     '$CLAUDE_PROJECT_DIR/'*) written="$project/${written#\$CLAUDE_PROJECT_DIR/}" ;;
     '${CLAUDE_PROJECT_DIR}/'*) written="$project/${written#\$\{CLAUDE_PROJECT_DIR\}/}" ;;
   esac
-  case $written in /*) full=$written ;; *) full="$cwd/$written" ;; esac
+  [[ $project =~ $DRIVE_PATH ]] && on_drive=1
+  normalize_path "$project" "$on_drive"; project=$NORM
+  normalize_path "$cwd" "$on_drive"; cwd=$NORM
+  normalize_path "$written" "$on_drive"; written=$NORM
+  case $written in
+    /* | [a-z]:/*) full=$written ;;
+    *) full="$cwd/$written" ;;
+  esac
   local IFS=/
   for part in $full; do
     case $part in
@@ -201,8 +231,9 @@ project_relative() {
       *) out="$out/$part" ;;
     esac
   done
+  [ -n "$on_drive" ] && out=${out#/}
   case $out in
-    "$project"/*) REL=${out#"$project"/} ;;
+    "${project%/}"/*) REL=${out#"${project%/}"/} ;;
   esac
 }
 
@@ -261,6 +292,7 @@ json_escape() {
 
 run_check() {
   local project=$1 file name problems=0 f key item ere has unanswered triggers
+  [[ $project =~ $DRIVE_PATH ]] && project=${project//\\//}
   shopt -s nullglob
   for file in "$project/$GUIDANCE_DIR"/*.md; do
     name=${file##*/}
@@ -312,8 +344,14 @@ run_hook() {
   fi
   is_hook_event "$event" || return 0
 
-  local project=${CLAUDE_PROJECT_DIR:-$cwd}
+  # CLAUDE_PROJECT_DIR is missing in some Windows sessions; the work tree
+  # holding cwd is the project there.
+  local project=${CLAUDE_PROJECT_DIR:-}
+  [ -n "$project" ] || project=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || project=$cwd
   [ -n "$cwd" ] || cwd=$project
+  # A backslash in a glob escapes the next character, and Git Bash takes `/`
+  # in a Windows path, so `C:\proj` is read as `C:/proj`.
+  [[ $project =~ $DRIVE_PATH ]] && project=${project//\\//}
   shopt -s nullglob
   local files=("$project/$GUIDANCE_DIR"/*.md)
   local count=${#files[@]}

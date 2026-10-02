@@ -261,3 +261,43 @@ describe("--check", () => {
     });
   });
 });
+
+describe("Windows paths", { skip: process.platform !== "win32" && "only on Windows" }, () => {
+  /** `C:\Users\x\p1` as Git Bash spells it: `/c/Users/x/p1`. */
+  const gitBashPath = (dir) => dir.replace(/^([A-Za-z]):/u, (_, drive) => `/${drive.toLowerCase()}`).replaceAll("\\", "/");
+
+  it("should read a file_path written with backslashes", () => {
+    const dir = makeProject({ "react.md": REACT });
+    const out = hook(dir, { hook_event_name: "PreToolUse", tool_input: { file_path: `${dir}\\src\\a.tsx` }, tool_name: "Edit" });
+    assert.equal(contextOf(out.stdout), pointer("react.md", "reached src/a.tsx"));
+  });
+
+  it("should read a file_path written with forward slashes", () => {
+    const dir = makeProject({ "react.md": REACT });
+    const out = hook(dir, { hook_event_name: "PreToolUse", tool_input: { file_path: `${dir.replaceAll("\\", "/")}/src/a.tsx` }, tool_name: "Edit" });
+    assert.equal(contextOf(out.stdout), pointer("react.md", "reached src/a.tsx"));
+  });
+
+  it("should read a Git Bash path in a Bash command", () => {
+    const dir = makeProject({ "react.md": REACT });
+    assert.equal(contextOf(bash(dir, `cat ${gitBashPath(dir)}/src/a.tsx`)), pointer("react.md", "reached src/a.tsx"));
+  });
+
+  it("should read a relative path when cwd is a Git Bash path", () => {
+    const dir = makeProject({ "react.md": REACT });
+    assert.equal(contextOf(bash(dir, "cat a.tsx", { cwd: `${gitBashPath(dir)}/src` })), pointer("react.md", "reached src/a.tsx"));
+  });
+});
+
+describe("without CLAUDE_PROJECT_DIR", () => {
+  it("should take the project from the git work tree holding cwd", () => {
+    const dir = makeProject({ "react.md": REACT });
+    fs.mkdirSync(path.join(dir, "src"));
+    const out = spawnSync("bash", [HOOK], {
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: "", SCOPED_GUIDANCE_TMP: path.join(dir, "tmp") },
+      input: JSON.stringify({ cwd: path.join(dir, "src"), hook_event_name: "PreToolUse", session_id: "s1", tool_input: { command: "cat a.tsx" }, tool_name: "Bash" }),
+    });
+    assert.equal(contextOf(out.stdout), pointer("react.md", "reached src/a.tsx"));
+  });
+});
